@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # =========================
-# Custom CSS (ألوان من البالِت حقتك)
+# Custom CSS
 # =========================
 st.markdown("""
 <style>
@@ -105,6 +105,14 @@ input, textarea {
     color: #210c5f !important;
     font-weight: 700;
 }
+            
+.total-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #210c5f !important;
+    margin-top: 8px !important;   
+}
+
 
 </style>
 """, unsafe_allow_html=True)
@@ -113,8 +121,8 @@ input, textarea {
 # =========================
 # Constants
 # =========================
-UNIT_PRICE = 8000          # سعر الجهاز
-FRAUD_THRESHOLD = 100000   # لو المجموع > هذا يعتبر high risk في الديمو
+UNIT_PRICE = 8000          
+FRAUD_THRESHOLD = 100000   
 PRODUCT_NAME = "OcUK Gaming Fluorite"
 PRODUCT_DESC = "Intel Core I5 14600KF, RTX 5070 Pre-Built Gaming PC"
 
@@ -122,19 +130,30 @@ PRODUCT_DESC = "Intel Core I5 14600KF, RTX 5070 Pre-Built Gaming PC"
 # Session State
 # =========================
 if "step" not in st.session_state:
-    st.session_state.step = "product"   # product -> checkout -> result
+    st.session_state.step = "product"   # product -> checkout
 if "quantity" not in st.session_state:
     st.session_state.quantity = 1
 if "total_amount" not in st.session_state:
     st.session_state.total_amount = UNIT_PRICE
+if "is_fraud" not in st.session_state:
+    st.session_state.is_fraud = None
+if "fraud_prob" not in st.session_state:
+    st.session_state.fraud_prob = 0.0
 
 # =========================
-# Helper: (حاليًا منطق بسيط بدل استدعاء FastAPI)
-# لاحقًا استبدليه بطلب حقيقي للـ API
+# Helper (Calls FastAPI endpoint)
+# This will later be fully replaced with the real backend logic if needed
 # =========================
-def call_fraud_api(total_amount: float, quantity: int):
+def call_fraud_api(quantity: int):
+    """
+    Calls FastAPI endpoint: /simulate_checkout
+    Returns:
+        - is_fraud_predicted (bool)
+        - fraud_probability (float between 0 and 1)
+    """
+
     url = "http://127.0.0.1:8000/simulate_checkout"
-    payload = {"quantity": quantity}
+    payload = {"quantity": int(quantity)}
     resp = requests.post(url, json=payload)
     data = resp.json()
     return data["is_fraud_predicted"], data["fraud_probability"]
@@ -162,7 +181,7 @@ with header_text_col:
         unsafe_allow_html=True
     )
 
-st.write("")  # مسافة بسيطة تحت الهيدر
+st.write("") 
 
 
 # =========================
@@ -197,10 +216,6 @@ if st.session_state.step == "product":
             f'<div class="total-text">Total: {total_amount:,.0f} SAR</div>',
             unsafe_allow_html=True
         )
-        st.markdown(
-            f'<div class="fraud-hint">* For demo: amounts above {FRAUD_THRESHOLD:,.0f} SAR will be treated as high-risk.</div>',
-            unsafe_allow_html=True
-        )
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.write("")
@@ -224,8 +239,6 @@ elif st.session_state.step == "checkout":
     with col2:
         st.text_input("CVV", value="", max_chars=4)
 
-    st.markdown('<hr/>', unsafe_allow_html=True)
-
     st.markdown(
         f'<div class="total-text">Total to Pay: {st.session_state.total_amount:,.0f} SAR</div>',
         unsafe_allow_html=True
@@ -235,44 +248,47 @@ elif st.session_state.step == "checkout":
     with col_back:
         if st.button("⬅ Back"):
             st.session_state.step = "product"
+            st.session_state.is_fraud = None
+            st.session_state.fraud_prob = 0.0
             st.rerun()
 
     with col_pay:
         if st.button("Pay Now 💳"):
-            # هنا نستدعي منطق الاحتيال (حاليًا mock)
-            is_fraud, fraud_prob = call_fraud_api(st.session_state.total_amount)
+            is_fraud, fraud_prob = call_fraud_api(st.session_state.quantity)
             st.session_state.is_fraud = is_fraud
             st.session_state.fraud_prob = fraud_prob
-            st.session_state.step = "result"
-            st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    # ===== Result message in the same page =====
+    if st.session_state.is_fraud is not None:
+        if st.session_state.is_fraud:
+            st.markdown(
+                """
+                <div style="
+                    margin-top: 16px;
+                    padding: 12px 16px;
+                    border-radius: 10px;
+                    background-color: #ffe6ea;
+                    border: 1px solid #f5a3b5;
+                " class="error-msg">
+                    ❌ Purchase rejected
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-# =========================
-# STEP 3: Result Page
-# =========================
-elif st.session_state.step == "result":
-    st.subheader("Transaction Result")
+        else:
+            st.markdown(
+                """
+                <div style="
+                    margin-top: 16px;
+                    padding: 12px 16px;
+                    border-radius: 10px;
+                    background-color: #e6fff2;
+                    border: 1px solid #8dd8b4;
+                " class="success-msg">
+                    ✅ Successful purchase
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-    is_fraud = st.session_state.get("is_fraud", False)
-    fraud_prob = st.session_state.get("fraud_prob", 0.0)
-
-    if is_fraud:
-        st.markdown(
-            f'<div class="error-msg">❌ Transaction Declined – Suspected Fraud '
-            f'({fraud_prob*100:.1f}% risk)</div>',
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown(
-            f'<div class="success-msg">✅ Payment Approved – Transaction Completed '
-            f'({fraud_prob*100:.1f}% fraud risk)</div>',
-            unsafe_allow_html=True
-        )
-
-    st.write("")
-    if st.button("New Purchase 🛒"):
-        st.session_state.step = "product"
-        st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
