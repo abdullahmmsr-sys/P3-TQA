@@ -151,11 +151,28 @@ def call_fraud_api(quantity: int):
         - is_fraud_predicted (bool)
         - fraud_probability (float between 0 and 1)
     """
-
     url = "http://127.0.0.1:8000/simulate_checkout"
     payload = {"quantity": int(quantity)}
-    resp = requests.post(url, json=payload)
-    data = resp.json()
+
+    try:
+        resp = requests.post(url, json=payload, timeout=10)
+    except requests.exceptions.RequestException as e:
+        st.error(f"Cannot reach backend API: {e}")
+        return False, 0.0
+
+    # لو الكود مو 200 نعرض النص بدل ما نحاول نحوله JSON
+    if resp.status_code != 200:
+        st.error(f"API returned error {resp.status_code}")
+        st.code(resp.text)
+        return False, 0.0
+
+    try:
+        data = resp.json()
+    except ValueError:
+        st.error("API did not return valid JSON:")
+        st.code(resp.text)
+        return False, 0.0
+
     return data["is_fraud_predicted"], data["fraud_probability"]
 
 # =========================
