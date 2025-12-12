@@ -183,7 +183,7 @@ header_logo_col, header_text_col = st.columns([1, 4])
 with header_logo_col:
     try:
         logo_img = Image.open("assets/logo.png")
-        st.image(logo_img, use_container_width=True)
+        st.image(logo_img, width='stretch')
     except Exception:
         st.write("NEXTGEN PC")
 

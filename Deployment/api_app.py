@@ -15,7 +15,7 @@ UNIT_PRICE = 8000
 # =========================
 # Load the trained model, scaler, and simulation dataset
 # =========================
-MODEL_PATH = "model.pkl"
+MODEL_PATH = "modelR.pkl"
 SIM_CSV_PATH = "api_simulation_samples.csv"
 
 model = joblib.load(MODEL_PATH)
